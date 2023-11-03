@@ -1,0 +1,50 @@
+{{- if .Values.traefik.enabled -}}
+{{- $fullName := include "aoh-service.fullname" . -}}
+{{- $svcPort := .Values.service.port -}}
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ .Values.traefik.name }}
+  labels:
+    {{- include "aoh-service.labels" . | nindent 4 }}
+  {{- with .Values.traefik.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  # {{- if and .Values.traefik.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
+  # ingressClassName: {{ .Values.traefik.className }}
+  # {{- end }}
+  {{- if .Values.traefik.tls }}
+  tls:
+    {{- range .Values.traefik.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  entryPoints:
+    {{- range $key, $value := .Values.traefik.entryPoints}}
+    - {{ . }}
+    {{- end }}
+  routes:
+    {{- range .Values.traefik.routes }}
+    - match: {{ .match }}
+      kind: Rule
+      middlewares:
+        {{- range .middlewares }}
+        - name: {{ .name }}
+          namespace: {{ .namespace }}
+        {{- end }}
+      services:
+        {{- range .services }}
+        - kind: Service
+          namespace: {{ .namespace }}
+          name: {{ .name }}
+          port: {{ .port }}
+          scheme: {{ .scheme }}
+        {{- end }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aoh-service.fullname" . }}
+  labels:
+    {{- include "aoh-service.labels" . | nindent 4 }}
+spec:
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "aoh-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "aoh-service.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "aoh-service.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        {{- toYaml .Values.initContainers | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}-api
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+  
+        env:
+        {{- range $key, $value := .Values.env }}
+          - name: {{ $key | quote }}
+            value: {{ $value | quote }}
+        {{- end }}
+        {{- range $key, $value := .Values.api.env }}
+          - name: {{ $key | quote }}
+            value: {{ $value | quote }}
+        {{- end }}
+        command:
+        {{- range $key, $value := .Values.api.command }}
+          - {{ . | quote }}
+        {{- end }}	  	  
+        ports:
+          - name: http
+            containerPort: {{ .Values.api.containerPort }} 
+            protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /info/liveness
+            port: http
+        readinessProbe:
+          httpGet:
+            path: /info/readiness
+            port: http
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+      - name: {{ .Chart.Name }}-worker
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+
+        env:
+        {{- range $key, $value := .Values.env }}
+          - name: {{ $key | quote }}
+            value: {{ $value | quote }}
+        {{- end }}
+        {{- range $key, $value := .Values.worker.env }}
+          - name: {{ $key | quote }}
+            value: {{ $value | quote }}
+        {{- end }}
+        command:
+        {{- range $key, $value := .Values.worker.command }}
+          - {{ . | quote }}
+        {{- end }}	  	  
+        ports:
+          - name: http
+            containerPort: {{ .Values.worker.containerPort }} 
+            protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /info/liveness
+            port: http
+        readinessProbe:
+          httpGet:
+            path: /info/readiness
+            port: http	    
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

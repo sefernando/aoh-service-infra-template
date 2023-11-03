@@ -1,0 +1,133 @@
+# Default values for ar2-service.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+env:
+  APP_PORT: 5000
+  WORKER_PORT: 5001
+
+  TEMPORAL_HOST: temporalio-frontend.common-wf
+  TEMPORAL_PORT: 7233
+  TEMPORAL_NAMESPACE: ar2
+
+initContainers:
+  - name: wait-for-temporalio-7233
+    image: busybox:1.35
+    command:
+      [
+        "sh",
+        "-c",
+        "until nc -zv temporalio-frontend.common-wf 7233 ; do echo waiting for temporalio-frontend.common-wf:7233 ; sleep 2; done",
+      ]
+
+api:
+  image:
+    pullPolicy: IfNotPresent
+
+    # UPDATE THIS SECTION
+    repository: REPLACE_WITH_SERVICE_API_CONTAINER_REGISTRY
+    tag: main-800f879
+
+  env:
+    APP_PORT: 5000
+  command:
+    - "./api"
+  containerPort: 5000
+worker:
+  image:
+    pullPolicy: IfNotPresent
+
+    # UPDATE THIS SECTION
+    repository: REPLACE_WITH_SERVICE_WORKER_CONTAINER_REGISTRY
+    tag: main-800f879
+
+  env:
+    WORKER_PORT: 5001
+  command:
+    - "./worker"
+  containerPort: 5001
+
+imagePullSecrets:
+  - name: gh-regcred
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations:
+    linkerd.io/inject: disabled
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations:
+  linkerd.io/inject: disabled
+
+podSecurityContext:
+  {}
+  # fsGroup: 2000
+
+securityContext:
+  {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 5000
+
+ingress:
+  enabled: false
+  # className: "traefik"
+  # annotations: {}
+  #   # linkerd.io/inject: enabled
+  #   # kubernetes.io/ingress.class: nginx
+  #   # kubernetes.io/tls-acme: "true"
+  # hosts:
+  #   - host: debug-service.dev.ar2
+  #     paths:
+  #       - path: /
+  #         pathType: ImplementationSpecific
+  #         backend:
+  #           service:
+  #             name: ar2-service
+  #             port:
+  #               number: 5000
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: #{}
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  limits:
+    cpu: 512m
+    memory: 1024Mi
+  requests:
+    cpu: 1m
+    memory: 8Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+revisionHistoryLimit: 3
